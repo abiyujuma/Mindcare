@@ -13,30 +13,28 @@ use Random\RandomError;
 use RealRashid\SweetAlert\Facades\Alert;
 use App\Models\Doctor;
 
-
 class AppointmentController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
         $Specializations = Specialization::all();
         return view('landingpage', compact('Specializations'));
     }
 
-    public function get_doctor(Request $request)
-    {
-        $id_special = $request->id_special;
-        $doctors = User::where('Specialization', $id_special)->get();
+public function get_doctor(Request $request)
+{
+    $id_special = $request->id_special;
+    $doctors = User::where('Specialization', $id_special)->get();
+    $fee = Specialization::find($id_special)?->fee ?? 0;
 
-        $opt = "<option value=''>Select Doctor</option>";
-        foreach ($doctors as $doctor) {
-            $opt .= "<option value='$doctor->id'>$doctor->name</option>";
-        }
+    return response()->json([
+        'doctors' => $doctors,
+        'fee' => $fee,
+    ]);
+}
 
-        echo $opt;
-    }
+
+
 
     public function check()
     {
@@ -48,10 +46,10 @@ class AppointmentController extends Controller
     {
         $searchdata = $request->searchdata;
 
-            $appointments = Appointment::where('AppointmentNumber', 'like', "$searchdata%")
+        $appointments = Appointment::where('AppointmentNumber', 'like', "$searchdata%")
             ->orWhere('Name', 'like', "$searchdata%")
             ->orWhere('MobileNumber', 'like', "$searchdata%")
-            ->with(['doctorUser.specialization']) // ini penting!
+            ->with(['doctorUser.specialization'])
             ->get();
 
         return view('check-appointment', compact('appointments', 'searchdata'));
@@ -83,60 +81,74 @@ class AppointmentController extends Controller
 
     public function approveAppointment($id)
     {
-    $appointment = Appointment::find($id);
-    
-    // Hitung antrian hari ini untuk dokter yang sama
-    $queueNumber = Appointment::where('doctor_id', $appointment->doctor_id)
-        ->whereDate('appointment_date', $appointment->appointment_date)
-        ->where('status', 'approved')
-        ->count() + 1;
+        $appointment = Appointment::find($id);
 
-    $appointment->status = 'approved';
-    $appointment->queue_number = $queueNumber;
-    $appointment->save();
+        $queueNumber = Appointment::where('doctor_id', $appointment->doctor_id)
+            ->whereDate('appointment_date', $appointment->appointment_date)
+            ->where('status', 'approved')
+            ->count() + 1;
 
-    return redirect()->back()->with('success', 'Appointment approved with queue number ' . $queueNumber);
+        $appointment->status = 'approved';
+        $appointment->queue_number = $queueNumber;
+        $appointment->save();
+
+        return redirect()->back()->with('success', 'Appointment approved with queue number ' . $queueNumber);
     }
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+
+    public function create() {}
+
+    public function store(Request $request)
     {
-        //
+        $doctor = User::find($request->Doctor);
+        $specialization = Specialization::find($request->Specialization);
+
+        $appointment = Appointment::create([
+            'AppointmentNumber' => random_int(10000, 99999),
+            'Name' => $request->Name,
+            'Email' => $request->Email,
+            'MobileNumber' => $request->MobileNumber,
+            'AppointmentDate' => $request->AppointmentDate,
+            'AppointmentTime' => $request->AppointmentTime,
+            'Specialization' => $request->Specialization,
+            'Doctor' => $request->Doctor,
+            'Message' => $request->Message,
+            'DoctorName' => $doctor->name ?? '-',
+            'DoctorSpecialist' => $doctor->specialization->Specialization ?? '-',
+            'DoctorWhatsapp' => $doctor->MobileNumber ?? '-',
+            'price' => $specialization->fee ?? 0,
+            'bonus' => $request->bonus ?? null,
+        ]);
+
+        Alert::success('Berhasil', 'Silakan lanjut ke pembayaran');
+        return view('payment', compact('appointment'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-  public function store(Request $request)
+    public function paymentPage($id)
+    {
+        $appointment = Appointment::findOrFail($id);
+        return view('payment', compact('appointment'));
+    }
+public function uploadPayment(Request $request, $id)
 {
-    $doctor = User::find($request->Doctor); // ambil data dokter
-
-    Appointment::create([
-        'AppointmentNumber' => random_int(10000, 99999),
-        'Name' => $request->Name,
-        'Email' => $request->Email,
-        'MobileNumber' => $request->MobileNumber,
-        'AppointmentDate' => $request->AppointmentDate,
-        'AppointmentTime' => $request->AppointmentTime,
-        'Specialization' => $request->Specialization,
-        'Doctor' => $request->Doctor,
-        'Message' => $request->Message,
-        'DoctorName' => $doctor->name ?? '-',
-        'DoctorSpecialist' => $doctor->specialist ?? '-',
-        'DoctorWhatsapp' => $doctor->MobileNumber ?? '-',
+    $request->validate([
+        'payment_proof' => 'required|mimes:jpg,jpeg,png,pdf|max:2048',
     ]);
 
-    Alert::success('Berhasil', 'Your Appointment Request Has Been Send. We Will Contact You Soon');
+    $appointment = Appointment::findOrFail($id);
 
-    return back();
+    if ($request->hasFile('payment_proof')) {
+        $file = $request->file('payment_proof');
+        $filename = time() . '_' . $file->getClientOriginalName();
+        $file->move(public_path('payments'), $filename);
+
+        $appointment->payment_proof = $filename;
+        $appointment->save();
+    }
+
+return redirect()->route('appointment.check')->with('success', 'Payment uploaded successfully');
+
 }
 
-
-
-    /**
-     * Display the specified resource.
-     */
     public function show($id, $aptnum)
     {
         $appointment = Appointment::where('id', $id)->where('AppointmentNumber', $aptnum)->first();
@@ -161,17 +173,8 @@ class AppointmentController extends Controller
         return view('doctor.search.index', compact('appointments', 'searchdata'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Appointment $appointment)
-    {
-        //
-    }
+    public function edit(Appointment $appointment) {}
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, $id)
     {
         $appointment = Appointment::find($id);
@@ -183,12 +186,5 @@ class AppointmentController extends Controller
         return to_route('allAppointment');
     }
 
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Appointment $appointment)
-    {
-        //
-    }
+    public function destroy(Appointment $appointment) {}
 }

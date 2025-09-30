@@ -28,6 +28,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/profil', [ProflController::class, 'update'])->name("profil.update");
 });
 
+
 Route::get('/', [AppointmentController::class, 'index'])->name("appointment.index");
 Route::post('/get-doctor', [AppointmentController::class, 'get_doctor'])->name("appointment.getDoctor");
 Route::post('/book-appointment', [AppointmentController::class, 'store'])->name("appointment.booking");
@@ -38,8 +39,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-});
 
+});
+Route::post('/payment/upload/{id}', [AppointmentController::class, 'uploadPayment'])->name('payment.upload');
+Route::get('/payment/{id}', [AppointmentController::class, 'paymentPage'])->name('payment.page');
 Route::post('/appointment/start/{id}', [AppointmentController::class, 'startConsultation'])->name('appointment.start');
 
 

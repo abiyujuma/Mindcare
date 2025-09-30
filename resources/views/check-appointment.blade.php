@@ -5,6 +5,14 @@
 
     <section class="section-padding" id="booking">
         <div class="container">
+
+            {{-- ✅ Flash message success --}}
+            @if (session('success'))
+                <div class="alert alert-success mt-3">
+                    {{ session('success') }}
+                </div>
+            @endif
+
             <div class="row">
 
                 <div class="col-lg-12 col-12 mx-auto">

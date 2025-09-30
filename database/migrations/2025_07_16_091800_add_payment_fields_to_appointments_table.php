@@ -9,19 +9,18 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-  public function up(): void
+public function up(): void
 {
     Schema::table('appointments', function (Blueprint $table) {
-        $table->string('DoctorName')->nullable();
-        $table->string('DoctorSpecialist')->nullable();
-        $table->string('DoctorWhatsapp')->nullable();
+        $table->string('payment_status')->default('pending');
+        $table->string('payment_proof')->nullable();
     });
 }
 
 public function down(): void
 {
     Schema::table('appointments', function (Blueprint $table) {
-        $table->dropColumn(['DoctorName', 'DoctorSpecialist', 'DoctorWhatsapp']);
+        $table->dropColumn(['payment_status', 'payment_proof']);
     });
 }
 
